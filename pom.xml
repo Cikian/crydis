@@ -2,18 +2,14 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <parent>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.7.18</version>
-        <relativePath/>
-    </parent>
 
     <groupId>cn.cikian</groupId>
     <artifactId>crydis</artifactId>
-    <version>0.0.2</version>
+    <version>0.1.0</version>
+    <packaging>jar</packaging>
     <name>Crydis</name>
-    <description>Redis工具库 - 支持Spring Boot 2.x/3.x和非Spring项目</description>
+    <description>Redis工具库 - 支持Java 8-21+、Spring Boot 2.6.6+/3.x/4.x和非Spring项目</description>
+    <url>https://github.com/Cikian/crydis</url>
 
     <developers>
         <developer>
@@ -29,44 +25,69 @@
     </developers>
 
     <properties>
+        <!-- Java 编译配置：支持 Java 8 及以上版本 -->
         <java.version>1.8</java.version>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
+        <maven.compiler.release>8</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- 依赖版本统一管理 -->
+        <spring-boot.version>2.7.18</spring-boot.version>
         <lombok.version>1.18.30</lombok.version>
-        <jackson.version>2.15.3</jackson.version>
+        <jackson.version>2.15.4</jackson.version>
         <logback.version>1.2.13</logback.version>
+        <jedis.version>3.9.0</jedis.version>
+        <junit.version>5.9.3</junit.version>
     </properties>
 
+    <!-- 不使用 Spring Boot Parent，采用 dependencyManagement 实现更灵活的版本管理 -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- Spring Boot BOM：用于管理 Spring Boot 依赖版本 -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
-        <!-- Spring Boot 自动配置（可选） -->
+        <!-- ==================== 核心依赖 ==================== -->
+        
+        <!-- Spring Boot 自动配置（可选）- 不指定版本，由 BOM 管理 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
             <optional>true</optional>
         </dependency>
 
+        <!-- Spring Boot 配置处理器（可选） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-configuration-processor</artifactId>
             <optional>true</optional>
         </dependency>
 
-        <!-- Jedis 依赖（可选，让使用方自行管理版本） -->
+        <!-- Redis Jedis 客户端（可选 - 使用方自行决定版本） -->
         <dependency>
             <groupId>redis.clients</groupId>
             <artifactId>jedis</artifactId>
+            <version>${jedis.version}</version>
             <optional>true</optional>
         </dependency>
 
-        <!-- Jackson 用于对象序列化 -->
+        <!-- Jackson 用于对象序列化 - 支持 Java 8-21+ -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
             <version>${jackson.version}</version>
         </dependency>
 
-        <!-- Lombok 辅助工具 -->
+        <!-- Lombok 辅助工具（可选） -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -74,14 +95,8 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- 测试依赖 -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- 日志依赖 -->
+        <!-- ==================== 日志依赖 ==================== -->
+        <!-- Logback（需要兼容 Java 8 及以上版本） -->
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
@@ -93,54 +108,233 @@
             <artifactId>logback-core</artifactId>
             <version>${logback.version}</version>
         </dependency>
+
+        <!-- ==================== 测试依赖 ==================== -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.junit.vintage</groupId>
+                    <artifactId>junit-vintage-engine</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- JUnit 5 显式依赖 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
+    <!-- ==================== 多版本兼容性 Profile ==================== -->
     <profiles>
-        <!-- 用于本地开发测试的 Profile（使用 Spring Boot 2.x 自带 Jedis） -->
+        <!-- 默认 Profile：Spring Boot 2.7.x (Java 8-17) -->
         <profile>
-            <id>dev-spring2</id>
+            <id>default</id>
             <activation>
                 <activeByDefault>true</activeByDefault>
             </activation>
-            <dependencies>
-                <dependency>
-                    <groupId>redis.clients</groupId>
-                    <artifactId>jedis</artifactId>
-                    <version>3.9.0</version>
-                </dependency>
-            </dependencies>
+            <properties>
+                <spring-boot.version>2.7.18</spring-boot.version>
+                <java.version>1.8</java.version>
+                <maven.compiler.source>1.8</maven.compiler.source>
+                <maven.compiler.target>1.8</maven.compiler.target>
+            </properties>
         </profile>
 
-        <!-- 用于测试 Spring Boot 3.x 的 Profile -->
+        <!-- Profile 1：Spring Boot 2.6.6 (最低要求 Java 8) -->
         <profile>
-            <id>dev-spring3</id>
+            <id>spring-boot-2.6</id>
+            <properties>
+                <spring-boot.version>2.6.15</spring-boot.version>
+                <java.version>1.8</java.version>
+                <maven.compiler.source>1.8</maven.compiler.source>
+                <maven.compiler.target>1.8</maven.compiler.target>
+            </properties>
+            <dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-dependencies</artifactId>
+                        <version>2.6.15</version>
+                        <type>pom</type>
+                        <scope>import</scope>
+                    </dependency>
+                </dependencies>
+            </dependencyManagement>
+        </profile>
+
+        <!-- Profile 2：Spring Boot 3.0-3.1 (需要 Java 17+) -->
+        <profile>
+            <id>spring-boot-3.0</id>
+            <properties>
+                <spring-boot.version>3.1.7</spring-boot.version>
+                <java.version>17</java.version>
+                <maven.compiler.source>17</maven.compiler.source>
+                <maven.compiler.target>17</maven.compiler.target>
+                <maven.compiler.release>17</maven.compiler.release>
+                <jackson.version>2.15.4</jackson.version>
+            </properties>
+            <dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-dependencies</artifactId>
+                        <version>3.1.7</version>
+                        <type>pom</type>
+                        <scope>import</scope>
+                    </dependency>
+                </dependencies>
+            </dependencyManagement>
             <dependencies>
-                <dependency>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-parent</artifactId>
-                    <version>3.2.0</version>
-                    <type>pom</type>
-                    <scope>import</scope>
-                </dependency>
                 <dependency>
                     <groupId>redis.clients</groupId>
                     <artifactId>jedis</artifactId>
                     <version>4.4.3</version>
+                    <optional>true</optional>
                 </dependency>
             </dependencies>
         </profile>
+
+        <!-- Profile 3：Spring Boot 3.2+ (需要 Java 17+) -->
+        <profile>
+            <id>spring-boot-3.2</id>
+            <properties>
+                <spring-boot.version>3.2.2</spring-boot.version>
+                <java.version>17</java.version>
+                <maven.compiler.source>17</maven.compiler.source>
+                <maven.compiler.target>17</maven.compiler.target>
+                <maven.compiler.release>17</maven.compiler.release>
+                <jackson.version>2.16.1</jackson.version>
+                <logback.version>1.4.14</logback.version>
+            </properties>
+            <dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-dependencies</artifactId>
+                        <version>3.2.2</version>
+                        <type>pom</type>
+                        <scope>import</scope>
+                    </dependency>
+                </dependencies>
+            </dependencyManagement>
+            <dependencies>
+                <dependency>
+                    <groupId>redis.clients</groupId>
+                    <artifactId>jedis</artifactId>
+                    <version>4.4.3</version>
+                    <optional>true</optional>
+                </dependency>
+            </dependencies>
+        </profile>
+
+        <!-- Profile 4：Spring Boot 4.x (需要 Java 21+) -->
+        <profile>
+            <id>spring-boot-4.0</id>
+            <properties>
+                <spring-boot.version>4.0.0-SNAPSHOT</spring-boot.version>
+                <java.version>21</java.version>
+                <maven.compiler.source>21</maven.compiler.source>
+                <maven.compiler.target>21</maven.compiler.target>
+                <maven.compiler.release>21</maven.compiler.release>
+                <jackson.version>2.17.0</jackson.version>
+                <logback.version>1.5.0</logback.version>
+            </properties>
+            <repositories>
+                <repository>
+                    <id>spring-snapshot</id>
+                    <url>https://repo.spring.io/snapshot</url>
+                    <snapshots>
+                        <enabled>true</enabled>
+                    </snapshots>
+                </repository>
+            </repositories>
+            <dependencyManagement>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-dependencies</artifactId>
+                        <version>4.0.0-SNAPSHOT</version>
+                        <type>pom</type>
+                        <scope>import</scope>
+                    </dependency>
+                </dependencies>
+            </dependencyManagement>
+            <dependencies>
+                <dependency>
+                    <groupId>redis.clients</groupId>
+                    <artifactId>jedis</artifactId>
+                    <version>5.0.0</version>
+                    <optional>true</optional>
+                </dependency>
+            </dependencies>
+        </profile>
+
+        <!-- Profile 5：Java 版本验证 Profile（用于测试 Java 11）-->
+        <profile>
+            <id>java-11</id>
+            <properties>
+                <java.version>11</java.version>
+                <maven.compiler.source>11</maven.compiler.source>
+                <maven.compiler.target>11</maven.compiler.target>
+                <maven.compiler.release>11</maven.compiler.release>
+            </properties>
+        </profile>
+
+        <!-- Profile 6：Java 版本验证 Profile（用于测试 Java 17）-->
+        <profile>
+            <id>java-17</id>
+            <properties>
+                <java.version>17</java.version>
+                <maven.compiler.source>17</maven.compiler.source>
+                <maven.compiler.target>17</maven.compiler.target>
+                <maven.compiler.release>17</maven.compiler.release>
+            </properties>
+        </profile>
+
+        <!-- Profile 7：Java 版本验证 Profile（用于测试 Java 21）-->
+        <profile>
+            <id>java-21</id>
+            <properties>
+                <java.version>21</java.version>
+                <maven.compiler.source>21</maven.compiler.source>
+                <maven.compiler.target>21</maven.compiler.target>
+                <maven.compiler.release>21</maven.compiler.release>
+            </properties>
+        </profile>
     </profiles>
 
+    <!-- ==================== 构建配置 ==================== -->
     <build>
         <plugins>
+            <!-- Maven 编译插件：配置灵活的编译选项 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.11.0</version>
+                <version>3.12.1</version>
                 <configuration>
                     <source>${maven.compiler.source}</source>
                     <target>${maven.compiler.target}</target>
+                    <release>${maven.compiler.release}</release>
                     <encoding>${project.build.sourceEncoding}</encoding>
+                    <!-- 启用预览特性（Java 12+ 可选） -->
+                    <enablePreview>false</enablePreview>
+                    <!-- 为了兼容性，禁用部分严格检查 -->
+                    <showWarnings>true</showWarnings>
+                    <showDeprecation>true</showDeprecation>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>
@@ -150,12 +344,13 @@
                         <path>
                             <groupId>org.springframework.boot</groupId>
                             <artifactId>spring-boot-configuration-processor</artifactId>
-                            <version>2.7.18</version>
+                            <version>${spring-boot.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
 
+            <!-- Maven 源代码插件 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
@@ -163,6 +358,29 @@
                 <executions>
                     <execution>
                         <id>attach-sources</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Maven Javadoc 插件 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.6.3</version>
+                <configuration>
+                    <encoding>UTF-8</encoding>
+                    <charset>UTF-8</charset>
+                    <doclint>none</doclint>
+                    <source>${maven.compiler.source}</source>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <phase>package</phase>
                         <goals>
                             <goal>jar</goal>
                         </goals>
@@ -170,14 +388,24 @@
                 </executions>
             </plugin>
 
+            <!-- Surefire 测试插件（支持 JUnit 5） -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.6.2</version>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.1.2</version>
                 <configuration>
-                    <encoding>UTF-8</encoding>
-                    <charset>UTF-8</charset>
+                    <includes>
+                        <include>**/*Test.java</include>
+                        <include>**/*Tests.java</include>
+                    </includes>
                 </configuration>
+            </plugin>
+
+            <!-- 版本检查插件（可选，用于检测过期依赖） -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>versions-maven-plugin</artifactId>
+                <version>2.16.2</version>
             </plugin>
         </plugins>
     </build>
