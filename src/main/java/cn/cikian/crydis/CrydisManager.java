@@ -76,7 +76,8 @@ public class CrydisManager {
 
             RedisClient redisClient = new RedisClient(configuration);
             Crydis.init(redisClient);
-            return Crydis.getRedisClient() != null ? null : null;
+            // 修复原始代码中无论如何都返回 null 的 Bug
+            return new Crydis(redisClient);
         }
 
         public Crydis build() {

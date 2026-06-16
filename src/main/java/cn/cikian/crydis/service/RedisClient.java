@@ -5,7 +5,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import redis.clients.jedis.DefaultJedisClientConfig;
+import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisClientConfig;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
 
@@ -13,7 +16,7 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Redis客户端封装
+ * Redis客户端封装（基于 Jedis 7.5.2+ 现代化重构）
  *
  * @author Cikian
  * @version 1.0
@@ -24,7 +27,7 @@ public class RedisClient {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private JedisPool jedisPool;
-    private CrydisConfiguration configuration;
+    private final CrydisConfiguration configuration;
 
     public RedisClient(CrydisConfiguration configuration) {
         this.configuration = configuration;
@@ -45,11 +48,18 @@ public class RedisClient {
             int database = configuration.getDatabase() != null ? configuration.getDatabase() : 0;
             int timeout = configuration.getTimeout() != null ? configuration.getTimeout() : 3000;
 
+            // 使用 Jedis 7.x 推荐的 ClientConfig 构建器替代废弃的多参数硬编码构造函数
+            DefaultJedisClientConfig.Builder configBuilder = DefaultJedisClientConfig.builder()
+                    .connectionTimeoutMillis(timeout)
+                    .socketTimeoutMillis(timeout)
+                    .database(database);
+
             if (password != null && !password.isEmpty()) {
-                jedisPool = new JedisPool(poolConfig, host, port, timeout, password, database);
-            } else {
-                jedisPool = new JedisPool(poolConfig, host, port, timeout, null, database);
+                configBuilder.password(password);
             }
+
+            JedisClientConfig clientConfig = configBuilder.build();
+            jedisPool = new JedisPool(poolConfig, new HostAndPort(host, port), clientConfig);
 
             log.info("Crydis RedisClient 初始化成功 - {}:{}", host, port);
         } catch (Exception e) {
@@ -96,11 +106,25 @@ public class RedisClient {
         try (Jedis jedis = getJedis()) {
             String value = jedis.get(key);
             log.debug("GET key={}", key);
-            return value;
+            return unwrapJsonString(value);
         } catch (Exception e) {
             log.error("GET key={} 失败", key, e);
             throw new RuntimeException("Redis GET操作失败", e);
         }
+    }
+
+    private String unwrapJsonString(String value) {
+        if (value == null) {
+            return null;
+        }
+        if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+            try {
+                return objectMapper.readValue(value, String.class);
+            } catch (JsonProcessingException e) {
+                return value;
+            }
+        }
+        return value;
     }
 
     public void delete(String key) {
@@ -162,8 +186,9 @@ public class RedisClient {
 
     public void hmset(String key, Map<String, String> hash) {
         try (Jedis jedis = getJedis()) {
-            jedis.hmset(key, hash);
-            log.debug("HMSET key={}", key);
+            // 在 Redis 官方及 Jedis 5.x/7.x 中，hmset 命令已被废弃，统一由支持 Map 的 hset 方法代理
+            jedis.hset(key, hash);
+            log.debug("HMSET (via hset) key={}", key);
         } catch (Exception e) {
             log.error("HMSET key={} 失败", key, e);
             throw new RuntimeException("Redis HMSET操作失败", e);
@@ -172,7 +197,7 @@ public class RedisClient {
 
     public String hget(String key, String field) {
         try (Jedis jedis = getJedis()) {
-            return jedis.hget(key, field);
+            return unwrapJsonString(jedis.hget(key, field));
         } catch (Exception e) {
             log.error("HGET key={} field={} 失败", key, field, e);
             throw new RuntimeException("Redis HGET操作失败", e);
@@ -181,7 +206,9 @@ public class RedisClient {
 
     public Map<String, String> hgetAll(String key) {
         try (Jedis jedis = getJedis()) {
-            return jedis.hgetAll(key);
+            Map<String, String> result = jedis.hgetAll(key);
+            result.replaceAll((k, v) -> unwrapJsonString(v));
+            return result;
         } catch (Exception e) {
             log.error("HGETALL key={} 失败", key, e);
             throw new RuntimeException("Redis HGETALL操作失败", e);
@@ -265,7 +292,7 @@ public class RedisClient {
 
     public String lpop(String key) {
         try (Jedis jedis = getJedis()) {
-            return jedis.lpop(key);
+            return unwrapJsonString(jedis.lpop(key));
         } catch (Exception e) {
             log.error("LPOP key={} 失败", key, e);
             throw new RuntimeException("Redis LPOP操作失败", e);
@@ -274,7 +301,7 @@ public class RedisClient {
 
     public String rpop(String key) {
         try (Jedis jedis = getJedis()) {
-            return jedis.rpop(key);
+            return unwrapJsonString(jedis.rpop(key));
         } catch (Exception e) {
             log.error("RPOP key={} 失败", key, e);
             throw new RuntimeException("Redis RPOP操作失败", e);
@@ -283,7 +310,9 @@ public class RedisClient {
 
     public List<String> lrange(String key, long start, long end) {
         try (Jedis jedis = getJedis()) {
-            return jedis.lrange(key, start, end);
+            List<String> result = jedis.lrange(key, start, end);
+            result.replaceAll(this::unwrapJsonString);
+            return result;
         } catch (Exception e) {
             log.error("LRANGE key={} 失败", key, e);
             throw new RuntimeException("Redis LRANGE操作失败", e);
@@ -311,7 +340,12 @@ public class RedisClient {
 
     public Set<String> smembers(String key) {
         try (Jedis jedis = getJedis()) {
-            return jedis.smembers(key);
+            Set<String> result = jedis.smembers(key);
+            Set<String> unwrapped = new HashSet<>();
+            for (String member : result) {
+                unwrapped.add(unwrapJsonString(member));
+            }
+            return unwrapped;
         } catch (Exception e) {
             log.error("SMEMBERS key={} 失败", key, e);
             throw new RuntimeException("Redis SMEMBERS操作失败", e);
@@ -339,8 +373,12 @@ public class RedisClient {
 
     public <T> void setObject(String key, T object) {
         try {
-            String json = objectMapper.writeValueAsString(object);
-            set(key, json);
+            if (object instanceof String) {
+                set(key, (String) object);
+            } else {
+                String json = objectMapper.writeValueAsString(object);
+                set(key, json);
+            }
         } catch (JsonProcessingException e) {
             log.error("序列化对象失败 key={}", key, e);
             throw new RuntimeException("对象序列化失败", e);
@@ -349,8 +387,12 @@ public class RedisClient {
 
     public <T> void setObject(String key, T object, long expireTime, TimeUnit timeUnit) {
         try {
-            String json = objectMapper.writeValueAsString(object);
-            set(key, json, expireTime, timeUnit);
+            if (object instanceof String) {
+                set(key, (String) object, expireTime, timeUnit);
+            } else {
+                String json = objectMapper.writeValueAsString(object);
+                set(key, json, expireTime, timeUnit);
+            }
         } catch (JsonProcessingException e) {
             log.error("序列化对象失败 key={}", key, e);
             throw new RuntimeException("对象序列化失败", e);
@@ -362,6 +404,9 @@ public class RedisClient {
             String json = get(key);
             if (json == null) {
                 return null;
+            }
+            if (clazz == String.class) {
+                return clazz.cast(json);
             }
             return objectMapper.readValue(json, clazz);
         } catch (JsonProcessingException e) {
