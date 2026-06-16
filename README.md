@@ -2,60 +2,21 @@
 
 ![Maven Central](https://img.shields.io/maven-central/v/cn.cikian/crydis?style=flat-square)
 ![Java](https://img.shields.io/badge/Java-8%2B-green?style=flat-square)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-2.6%2B-brightgreen?style=flat-square)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-2.7%2B-brightgreen?style=flat-square)
 ![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
 
 ## 简介
 
-Crydis 是一个轻量级、高效的 Redis 工具库，**完美支持 Java 8-21+ 和 Spring Boot 2.6.6-4.x**，同时支持非 Spring 项目。提供流畅的静态方法调用方式，开箱即用。
+Crydis 是一个轻量级、高效的 Redis 工具库，**基于 Jedis 7.5.2** 构建，完美支持 Java 8+ 和 Spring Boot 2.7+，同时支持非 Spring 项目。提供流畅的静态方法调用方式，开箱即用。
 
 ## ✨ 核心特性
 
-- 🚀 **多版本支持**：Java 8-21+、Spring Boot 2.6.6-4.x 完整兼容
-- 📌 **静态方法调用**：直接使用 `Crydis.xxx()` 方法，无需注入
-- 🎯 **自动配置**：Spring Boot 2.x/3.x 均完美支持
-- 🔧 **非 Spring 友好**：手动初始化，灵活配置，适合微服务和工具类项目
-- 🔌 **版本适配**：自动适配 Jedis 3.x 和 4.x
-- 📦 **完整功能**：String、Hash、List、Set、计数器、对象序列化等
-- 🎨 **简洁设计**：API ���观易用，代码量小
-
-## 🔄 版本支持矩阵
-
-### 快速查询
-
-| Java 版本 | Spring Boot 版本 | 编译命令 | 支持度 |
-|----------|-----------------|--------|-------|
-| 8-11     | 2.6.6-2.7.x    | `默认` 或 `-P spring-boot-2.6` | ✅ |
-| 8        | 2.6.6          | `-P spring-boot-2.6` | ✅ 最低版本 |
-| 17+      | 3.0-3.1.x      | `-P spring-boot-3.0` | ✅ |
-| 17+      | 3.2.x+         | `-P spring-boot-3.2` | ✅ |
-| 21+      | 4.x            | `-P spring-boot-4.0` | ⚠️ 预览 |
-| 8+       | 非 Spring 项目  | 使用 CrydisManager | ✅ |
-
-**📚 详细版本对应表和使用指南：**
-- [**快速参考**](QUICK_REFERENCE.md) ⚡ - 一行命令、常用代码、FAQ
-- [**完整兼容性指南**](VERSION_COMPATIBILITY.md) 📖 - 详细的配置和故障排除
-
-### Spring Boot 项目
-
-| Spring Boot 版本 | Java 版本 | Jedis 版本 | 支持状态 |
-|-----------------|----------|-----------|--------|
-| 2.6.6-2.6.x     | 8+       | 3.9.0     | ✅ 完全支持 |
-| 2.7.x           | 8-17     | 3.9.0     | ✅ 推荐版本 |
-| 3.0-3.1.x       | 17+      | 4.4.3     | ✅ 完全支持 |
-| 3.2.x+          | 17+      | 4.4.3     | ✅ 完全支持 |
-| 4.x             | 21+      | 5.0.0     | ⚠️ 预览版本 |
-
-> 💡 **Spring Boot 项目无需手动管理 Jedis 版本**，项目会自动适配！
-
-### 非 Spring 项目
-
-| Java 版本 | 推荐 Jedis 版本 | 理由 |
-|----------|---------------|------|
-| 8-11     | 3.9.0         | 最后的稳定版，完全兼容 Java 8 |
-| 12-16    | 4.4.3         | 更好的性能和特性 |
-| 17+      | 4.4.3         | 标配版本 |
-| 21+      | 5.0.0         | 最新版本 |
+- 🚀 **高性能**: 基于 Jedis 7.5.2，采用现代化 API 设计
+- 📌 **静态方法调用**: 直接使用 `Crydis.xxx()` 方法，无需注入
+- 🎯 **自动配置**: Spring Boot 2.7+ 完美支持自动配置
+- 🔧 **非 Spring 友好**: 手动初始化，灵活配置，适合微服务和工具类项目
+- 📦 **完整功能**: String、Hash、List、Set、计数器、对象序列化等
+- 🎨 **简洁设计**: API 直观易用，代码量小
 
 ## 📦 Maven 依赖
 
@@ -65,39 +26,17 @@ Crydis 是一个轻量级、高效的 Redis 工具库，**完美支持 Java 8-21
 <dependency>
     <groupId>cn.cikian</groupId>
     <artifactId>crydis</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.3</version>
 </dependency>
 ```
 
-### 非 Spring 项目（Java 8）
+### 非 Spring 项目
 
 ```xml
 <dependency>
     <groupId>cn.cikian</groupId>
     <artifactId>crydis</artifactId>
-    <version>0.1.0</version>
-</dependency>
-
-<dependency>
-    <groupId>redis.clients</groupId>
-    <artifactId>jedis</artifactId>
-    <version>3.9.0</version>
-</dependency>
-```
-
-### 非 Spring 项目（Java 17+）
-
-```xml
-<dependency>
-    <groupId>cn.cikian</groupId>
-    <artifactId>crydis</artifactId>
-    <version>0.1.0</version>
-</dependency>
-
-<dependency>
-    <groupId>redis.clients</groupId>
-    <artifactId>jedis</artifactId>
-    <version>4.4.3</version>
+    <version>0.1.3</version>
 </dependency>
 ```
 
@@ -256,125 +195,43 @@ Crydis.setObject("user:2", user, 60, TimeUnit.MINUTES);
 User retrieved = Crydis.getObject("user:1", User.class);
 ```
 
-## 💻 开发和编译
-
-### 多版本编译
-
-```bash
-# 默认编译（Spring Boot 2.7.x, Java 8）
-mvn clean install
-
-# Spring Boot 2.6.6 编译（最低版本，Java 8）
-mvn clean install -P spring-boot-2.6
-
-# Spring Boot 3.x 编译（Java 17+）
-mvn clean install -P spring-boot-3.0
-
-# Spring Boot 3.2+ 编译（Java 17+）
-mvn clean install -P spring-boot-3.2
-
-# Spring Boot 4.x 编译（Java 21+，预览）
-mvn clean install -P spring-boot-4.0
-```
-
-### 多版本测试
-
-```bash
-# Java 11 兼容性测试
-mvn clean test -P java-11
-
-# Java 17 兼容性测试
-mvn clean test -P java-17
-
-# Java 21 兼容性测试
-mvn clean test -P java-21
-```
-
-### 完整的开发工作流
-
-```bash
-# 1. 清理编译
-mvn clean install
-
-# 2. 验证多 Spring Boot 版本兼容性
-mvn clean test -P spring-boot-2.6
-mvn clean test -P spring-boot-3.0
-mvn clean test -P spring-boot-3.2
-
-# 3. 验证多 Java 版本兼容性
-mvn clean test -P java-11
-mvn clean test -P java-17
-
-# 4. 生成文档和源码
-mvn clean source:jar javadoc:jar
-
-# 5. 打包
-mvn clean package -DskipTests
-```
-
-## ⚠️ 注意事项
-
-1. **初始化顺序**：非 Spring 项目必须先初始化才能使用
-2. **资源释放**：非 Spring 项目结束时建议调用 `Crydis.destroy()`
-3. **线程安全**：所有静态方法调用均为线程安全
-4. **Spring Boot 2.6.6**：推荐最低使用 2.6.6 版本以获得最佳稳定性
-5. **Jedis 版本冲突**：使用 Spring Boot 3.x 时自动升级到 Jedis 4.4.3
-
 ## 📊 项目结构
 
 ```
 cn.cikian.crydis
-├── Crydis.java                 # 静态方法入口
-├── CrydisManager.java          # 非Spring项目管理器
+├── CrydisManager.java                    # 非Spring项目管理器
 ├── model/
-│   └── CrydisConfiguration.java # Spring Boot 配置类
+│   └── CrydisConfiguration.java          # 配置类
 ├── service/
-│   ├── RedisClient.java        # Redis 客户端核心实现
-│   └── Crydis.java             # 静态方法包装
+│   ├── Crydis.java                       # 静态方法入口
+│   └── RedisClient.java                  # Redis客户端核心实现
 ├── autoconfigure/
-│   └── CrydisAutoConfiguration.java # Spring Boot 自动配置
-├── config/
-│   ├── LogbackCustomHtmlLayout.java # HTML 日志样式
-│   └── SmartLogbackConfigurator.java # 智能日志配置
+│   └── CrydisAutoConfiguration.java      # Spring Boot自动配置
 └── exception/
-    └── CikException.java       # 自定义异常
+    └── CikException.java                 # 自定义异常
 ```
 
-## 📚 文档导航
+## 🔧 配置说明
 
-| 文档 | 用途 |
-|-----|------|
-| [QUICK_REFERENCE.md](QUICK_REFERENCE.md) | ⚡ 快速参考 - 常用命令和代码片段 |
-| [VERSION_COMPATIBILITY.md](VERSION_COMPATIBILITY.md) | 📖 完整兼容性指南 - 详细配置、故障排除 |
-| [本 README](README.md) | 📋 项目概览和使用指南 |
+| 配置项 | 类型 | 默认值 | 说明 |
+|-------|------|-------|------|
+| enable | boolean | false | 是否启用Crydis |
+| host | String | - | Redis服务器地址 |
+| port | int | 6379 | Redis服务器端口 |
+| password | String | - | Redis密码 |
+| database | int | 0 | Redis数据库索引 |
+| timeout | int | 3000 | 连接超时时间(ms) |
+| max-active | int | 50 | 最大连接数 |
+| max-idle | int | 10 | 最大空闲连接数 |
+| min-idle | int | 5 | 最小空闲连接数 |
+| max-wait | long | 3000 | 最大等待时间(ms) |
 
-## 🔍 故障排除
+## ⚠️ 注意事项
 
-### 常见问题
-
-**Q: 我的 Spring Boot 是 2.6.6，能用吗？**
-```bash
-mvn clean install -P spring-boot-2.6
-```
-✅ 可以！这是最低支持版本
-
-**Q: 我的 Spring Boot 是 3.2，我的 Java 是 17，怎么编译？**
-```bash
-mvn clean install -P spring-boot-3.2
-```
-✅ 已完全支持
-
-**Q: 非 Spring 项目怎么用？**
-```java
-CrydisManager.builder()
-    .host("localhost")
-    .port(6379)
-    .init();
-Crydis.set("key", "value");
-```
-✅ 完全支持，见快速开始
-
-更多常见问题和解决方案，请查看 [VERSION_COMPATIBILITY.md](VERSION_COMPATIBILITY.md)
+1. **初始化顺序**：非 Spring 项目必须先初始化才能使用
+2. **资源释放**：非 Spring 项目结束时建议调用 `CrydisManager.destroy()`
+3. **线程安全**：所有静态方法调用均为线程安全
+4. **依赖冲突**：项目已内置 Jedis 7.5.2，无需额外引入
 
 ## 🤝 贡献
 
@@ -382,7 +239,7 @@ Crydis.set("key", "value");
 
 ## 📄 License
 
-MIT License - 详见 [LICENSE](LICENSE) 文件
+MIT License
 
 ## 🔗 相关资源
 
@@ -392,6 +249,6 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ---
 
-**最后更新**: 2026-05-31  
-**当前版本**: 0.1.0  
+**最后更新**: 2026-06-17  
+**当前版本**: 0.1.3  
 **维护者**: [Cikian Chen](https://www.cikian.cn)
