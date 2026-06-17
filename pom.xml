@@ -5,9 +5,9 @@
 
     <groupId>cn.cikian</groupId>
     <artifactId>crydis</artifactId>
-    <version>0.1.3</version>
+    <version>0.1.5</version>
     <packaging>jar</packaging>
-    <name>Crydis-3</name>
+    <name>Crydis</name>
     <description>Redis工具库 - 支持Java 8-21+、Spring Boot 2.6.6+/3.x/4.x和非Spring项目</description>
     <url>https://github.com/Cikian/crydis</url>
 
