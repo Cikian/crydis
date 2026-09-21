@@ -2,29 +2,40 @@
 
 # Spring Boot 项目配置示例
 # 在 application.yml 或 application.properties 中添加以下配置
+#
+# 注意：配置前缀是 ck.crydis（不是 crydis）。
+# properties 中等价写法：ck.crydis.enable=true
 
-crydis:
-  enable: true
-  host: localhost
-  port: 6379
-  password:
-  database: 0
-  timeout: 3000
-  max-active: 50
-  max-idle: 10
-  min-idle: 5
-  max-wait: 3000
+ck:
+  crydis:
+    enable: true
+    host: localhost
+    port: 6379
+    password:
+    # user:                    # 仅 Redis >= 6.0 的 ACL 用户需要配置
+    database: 0
+    timeout: 3000
+    max-active: 50
+    max-idle: 10
+    min-idle: 5
+    max-wait: 3000
+    # allowed-packages:        # 反序列化白名单（文本前缀匹配，不支持 * 通配符）
+    #   - cn.cikian.demo.
+    # unwrap-quoted-string: false   # 仅用于兼容历史版本写入的带引号数据
 
 # ============================================
-# 配置说明
+# 配置说明（以下均为 ck.crydis.* 下的配置项）
 # ============================================
-# enable:        是否启用Crydis (true/false)
-# host:          Redis服务器地址
-# port:          Redis服务器端口 (默认: 6379)
-# password:      Redis密码 (无密码则留空)
-# database:      Redis数据库索引 (默认: 0)
-# timeout:       连接超时时间，单位毫秒 (默认: 3000)
-# max-active:    最大连接数 (默认: 50)
-# max-idle:      最大空闲连接数 (默认: 10)
-# min-idle:      最小空闲连接数 (默认: 5)
-# max-wait:      最大等待时间，单位毫秒 (默认: 3000)
+# enable:               是否启用Crydis (true/false)
+# host:                 Redis服务器地址
+# port:                 Redis服务器端口 (默认: 6379)
+# user:                 ACL用户名，仅 Redis >= 6.0 支持；不配置则只发送单参数 AUTH password
+# password:             Redis密码 (无密码则留空)
+# database:             Redis数据库索引 (默认: 0)
+# timeout:              连接/读写超时时间，单位毫秒 (默认: 3000)
+# max-active:           最大连接数 (默认: 50)
+# max-idle:             最大空闲连接数 (默认: 10)
+# min-idle:             最小空闲连接数 (默认: 5)
+# max-wait:             获取连接最大等待时间，单位毫秒 (默认: 3000)
+# allowed-packages:     反序列化白名单前缀列表，留空时仅放行 getObject 的目标类型自身
+# unwrap-quoted-string: 是否剥离首尾双引号（会篡改合法值），仅兼容历史数据时开启

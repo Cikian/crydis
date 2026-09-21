@@ -21,47 +21,81 @@ import java.util.concurrent.TimeUnit;
  */
 public class Crydis {
     private static final Logger log = LoggerFactory.getLogger(Crydis.class);
-    private static RedisClient redisClient;
-    private static volatile boolean initialized = false;
 
+    /**
+     * 静态单例客户端。volatile 保证双重检查锁下的可见性。
+     */
+    private static volatile RedisClient redisClient;
+
+    /**
+     * @deprecated 直接 new 会覆盖静态单例，且旧实例的连接池不会被关闭，存在连接池泄漏风险。
+     * 请使用 {@link #init(CrydisConfiguration)} 或 {@code CrydisManager.builder()...init()}。
+     */
+    @Deprecated
     public Crydis(CrydisConfiguration configuration) {
-        redisClient = new RedisClient(configuration);
+        init(configuration);
     }
 
+    /**
+     * @deprecated 直接 new 会覆盖静态单例。请使用 {@link #init(RedisClient)}。
+     */
+    @Deprecated
     public Crydis(RedisClient redisClient) {
-        Crydis.redisClient = redisClient;
+        init(redisClient);
     }
 
+    /**
+     * 初始化静态客户端。
+     *
+     * <p>幂等：已初始化且连接池仍然可用时不会重复创建；若此前已初始化，会输出 WARN 并
+     * 释放旧连接池后使用新配置重建（Spring 上下文刷新等场景下旧池可能已关闭）。</p>
+     */
     public static void init(CrydisConfiguration configuration) {
-        if (!initialized) {
-            synchronized (Crydis.class) {
-                if (!initialized) {
-                    redisClient = new RedisClient(configuration);
-                    initialized = true;
-                    log.info("Crydis 初始化成功");
-                }
-            }
+        if (configuration == null) {
+            throw new IllegalArgumentException("CrydisConfiguration 不能为 null");
         }
+        replaceClient(new RedisClient(configuration), "配置初始化");
     }
 
+    /**
+     * 使用外部 RedisClient 初始化静态入口（Spring 自动配置使用）。
+     */
     public static void init(RedisClient redisClient) {
-        if (!initialized) {
-            synchronized (Crydis.class) {
-                if (!initialized) {
-                    Crydis.redisClient = redisClient;
-                    initialized = true;
-                    log.info("Crydis 初始化成功（使用外部RedisClient）");
-                }
+        if (redisClient == null) {
+            throw new IllegalArgumentException("RedisClient 不能为 null");
+        }
+        replaceClient(redisClient, "外部 RedisClient");
+    }
+
+    private static synchronized void replaceClient(RedisClient newClient, String source) {
+        RedisClient old = redisClient;
+        if (old == newClient) {
+            return;
+        }
+        if (old != null) {
+            if (old.isClosed()) {
+                log.warn("Crydis 检测到旧的连接池已关闭，正在使用新配置重建（来源：{}）", source);
+            } else {
+                log.warn("Crydis 已被初始化过，本次调用将替换原有客户端并关闭旧连接池（来源：{}）", source);
+            }
+            // 显式释放旧池，避免"被覆盖的池永远不会关闭"导致的连接泄漏
+            try {
+                old.close();
+            } catch (Exception e) {
+                log.warn("关闭旧 RedisClient 连接池时发生异常", e);
             }
         }
+        redisClient = newClient;
+        log.info("Crydis 初始化成功（来源：{}）", source);
     }
 
     public static void destroy() {
-        if (redisClient != null) {
-            redisClient.destroy();
-            redisClient = null;
-            initialized = false;
-            log.info("Crydis 已销毁");
+        synchronized (Crydis.class) {
+            if (redisClient != null) {
+                redisClient.close();
+                redisClient = null;
+                log.info("Crydis 已销毁");
+            }
         }
     }
 
@@ -229,6 +263,26 @@ public class Crydis {
     public static <T> T getObject(String key, Class<T> clazz) {
         checkInit();
         return redisClient.getObject(key, clazz);
+    }
+
+    /**
+     * 反序列化对象，并额外指定 autoType 白名单（与 {@code crydis.allowed-packages} 取并集）。
+     *
+     * <p>注意：fastjson2 白名单是文本前缀匹配且不支持 {@code *} 通配符，
+     * {@code "cn.foo."} 放行 {@code cn.foo} 包下所有类。</p>
+     *
+     * @param allowedPackagePrefixes 额外放行的包/类名前缀
+     */
+    public static <T> T getObject(String key, Class<T> clazz, String... allowedPackagePrefixes) {
+        checkInit();
+        return redisClient.getObject(key, clazz, allowedPackagePrefixes);
+    }
+
+    /**
+     * 释放当前静态客户端的连接池（可重复调用）。
+     */
+    public static void close() {
+        destroy();
     }
 
     public static Long append(String key, String value) {
@@ -399,6 +453,37 @@ public class Crydis {
     public static boolean unlock(String key, String expectedValue) {
         checkInit();
         return redisClient.unlock(key, expectedValue);
+    }
+
+    /**
+     * 使用 SCAN 游标获取匹配的键（推荐替代 {@link #keys(String)}）。
+     */
+    public static Set<String> scan(String pattern) {
+        checkInit();
+        return redisClient.scan(pattern);
+    }
+
+    /**
+     * 获取匹配模式的所有键。
+     *
+     * @deprecated KEYS 是 O(N) 阻塞命令，请改用 {@link #scan(String)}。
+     */
+    @Deprecated
+    public static Set<String> keys(String pattern) {
+        checkInit();
+        return redisClient.keys(pattern);
+    }
+
+    /**
+     * 获取匹配模式的 String 类型键值对。
+     *
+     * @deprecated 内部使用阻塞命令 KEYS，且非 String 类型会被跳过，请改用
+     * {@link #scan(String)} + {@link #mget(String...)} 组合。
+     */
+    @Deprecated
+    public static Map<String, String> getKeysWithValues(String pattern) {
+        checkInit();
+        return redisClient.getKeysWithValues(pattern);
     }
 
     public static RedisClient getRedisClient() {

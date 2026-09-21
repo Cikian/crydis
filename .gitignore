@@ -4,6 +4,13 @@ log/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+### Maven Shade ###
+dependency-reduced-pom.xml
+
+### JVM crash dumps ###
+hs_err_pid*.log
+replay_pid*.log
+
 ### STS ###
 .apt_generated
 .classpath
@@ -31,3 +38,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+.jedis-research
+_ff2

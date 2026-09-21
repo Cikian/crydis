@@ -5,7 +5,7 @@
 
     <groupId>cn.cikian</groupId>
     <artifactId>crydis</artifactId>
-    <version>0.1.5</version>
+    <version>0.2.6</version>
     <packaging>jar</packaging>
     <name>Crydis</name>
     <description>Redis工具库 - 支持Java 8-21+、Spring Boot 2.6.6+/3.x/4.x和非Spring项目</description>
@@ -33,6 +33,7 @@
         <spring-boot.version>2.7.18</spring-boot.version>
         <lombok.version>1.18.30</lombok.version>
         <jackson.version>2.15.4</jackson.version>
+        <fastjson2.version>2.0.65</fastjson2.version>
         <jedis.version>7.5.2</jedis.version>
         <junit.version>5.9.3</junit.version>
     </properties>
@@ -69,6 +70,12 @@
         </dependency>
 
         <dependency>
+            <groupId>com.alibaba.fastjson2</groupId>
+            <artifactId>fastjson2</artifactId>
+            <version>${fastjson2.version}</version>
+        </dependency>
+
+        <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
             <version>${jackson.version}</version>
@@ -85,13 +92,6 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <version>1.7.36</version>
-        </dependency>
-
-        <dependency>
-            <groupId>cn.cikian</groupId>
-            <artifactId>log</artifactId>
-            <version>1.2.11</version>
-            <optional>true</optional>
         </dependency>
 
         <dependency>
@@ -128,6 +128,7 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.12.1</version>
                 <configuration>
+                    <!-- source/target 用于 JDK 8 编译；JDK 9+ 由下方 jdk9plus profile 追加 release 校验 -->
                     <source>${maven.compiler.source}</source>
                     <target>${maven.compiler.target}</target>
                     <encoding>${project.build.sourceEncoding}</encoding>
@@ -159,6 +160,8 @@
                         <configuration>
                             <createSourcesJar>true</createSourcesJar>
                             <promoteTransitiveDependencies>false</promoteTransitiveDependencies>
+                            <!-- 不再在项目根目录生成 dependency-reduced-pom.xml 这个构建产物 -->
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
 
                             <artifactSet>
                                 <includes>
@@ -224,14 +227,37 @@
 
     <distributionManagement>
         <repository>
-            <id>cikian-private-repo</id>
+            <id>CikianMaven</id>
             <name>Cikian Release Repository</name>
             <url>https://mvnrep.cikian.cn/repository/public/</url>
         </repository>
         <snapshotRepository>
-            <id>cikian-private-repo</id>
+            <id>CikianMaven</id>
             <name>Cikian Snapshot Repository</name>
             <url>https://mvnrep.cikian.cn/repository/public/</url>
         </snapshotRepository>
     </distributionManagement>
+
+    <profiles>
+        <!-- JDK 9+ 上用 release 替代 source/target，确保不会误用高版本 JDK 的 API。
+             JDK 8 的 javac 不支持该参数，因此仅在 JDK 9+ 激活本 profile。 -->
+        <profile>
+            <id>jdk9plus</id>
+            <activation>
+                <jdk>[9,)</jdk>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <version>3.12.1</version>
+                        <configuration>
+                            <release>8</release>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

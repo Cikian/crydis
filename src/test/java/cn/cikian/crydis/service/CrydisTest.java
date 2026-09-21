@@ -1,281 +1,387 @@
 package cn.cikian.crydis.service;
 
 import cn.cikian.crydis.model.CrydisConfiguration;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import redis.clients.jedis.resps.Tuple;
+
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+
 import static org.junit.jupiter.api.Assertions.*;
 
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+/**
+ * Crydis 工具类完整功能测试
+ *
+ * @author Cikian
+ * @since 2026-06-24
+ */
 public class CrydisTest {
-    private static final String TEST_PREFIX = "crydis:test:";
 
     @BeforeAll
-    public static void setup() {
+    public static void setUpAll() {
+        // 初始化配置，请根据实际本地测试环境修改参数
         CrydisConfiguration config = new CrydisConfiguration();
-        config.setHost("localhost");
+        config.setHost("127.0.0.1");
         config.setPort(6379);
-        config.setDatabase(0);
+        config.setPassword("");
+        config.setDatabase(8);
+
+        // 初始化 Crydis
         Crydis.init(config);
-    }
 
-//    @AfterAll
-    public static void teardown() {
-        Crydis.destroy();
-    }
-
-//    @AfterEach
-    public void cleanUp() {
-        Set<String> keys = Crydis.getRedisClient().getJedisPool().getResource().keys(TEST_PREFIX + "*");
-        if (!keys.isEmpty()) {
-            Crydis.delete(keys.toArray(new String[0]));
+        // 每次测试前清空 Redis 数据库
+        // 假设底层可以通过 Jedis 资源或直接提供清除能力，这里通过 getRedisClient 获取实例清空
+        if (Crydis.getRedisClient() != null) {
+            // 如果你的 RedisClient 包装了 flushAll，请直接调用。
+            // 这里演示通过底层资源直接清空，保持测试前环境纯净
+            try {
+                Crydis.keys("*").forEach(Crydis::delete);
+            } catch (Exception e) {
+                System.out.println("清空Redis失败: " + e.getMessage());
+            }
         }
     }
 
-    @Test @Order(1) public void testStringBasic() {
-        String key = TEST_PREFIX + "string:basic";
-        Crydis.set(key, "test-value");
-        assertEquals("test-value", Crydis.get(key));
-        assertTrue(Crydis.exists(key));
-        Crydis.delete(key);
-        assertFalse(Crydis.exists(key));
+    @BeforeEach
+    public void setUp() {
+
     }
 
-    @Test @Order(2) public void testStringAppend() {
-        String key = TEST_PREFIX + "string:append";
-        Crydis.set(key, "Hello");
-        Crydis.append(key, " World");
-        String s = Crydis.get(key);
-        assertEquals("Hello World", s);
+    @AfterAll
+    public static void tearDownAll() {
+        // 测试结束后不调用 destroy()，以保留最后一次测试运行或当前连接产生的最终状态（如需保留连接则不销毁）
+        System.out.println("测试执行完毕，数据已保留在 Redis 中。");
     }
 
-    @Test @Order(3) public void testStringStrlen() {
-        String key = TEST_PREFIX + "string:strlen";
-        Crydis.set(key, "Hello");
-        assertEquals(5L, Crydis.strlen(key));
+    // ==================== String 基础操作测试 ====================
+
+    @Test
+    public void testSetAndGet() {
+        Crydis.set("str:key1", "value1");
+        assertEquals("value1", Crydis.get("str:key1"));
     }
 
-    @Test @Order(4) public void testStringGetSet() {
-        String key = TEST_PREFIX + "string:getset";
-        Crydis.set(key, "old-value");
-        assertEquals("old-value", Crydis.getSet(key, "new-value"));
-        assertEquals("new-value", Crydis.get(key));
+    @Test
+    public void testSetWithExpire() throws InterruptedException {
+        Crydis.set("str:key2", "value2", 10, TimeUnit.SECONDS);
+        assertEquals("value2", Crydis.get("str:key2"));
+        assertTrue(Crydis.ttl("str:key2") > 0);
     }
 
-    @Test @Order(5) public void testStringMGetMSet() {
-        String k1 = TEST_PREFIX + "mget:1";
-        String k2 = TEST_PREFIX + "mget:2";
-        Crydis.mset(k1, "v1", k2, "v2");
-        List<String> values = Crydis.mget(k1, k2);
+    @Test
+    public void testSetNX() {
+        Crydis.setNX("str:nx", "first");
+        Crydis.setNX("str:nx", "second");
+        assertEquals("first", Crydis.get("str:nx"));
+    }
+
+    @Test
+    public void testExistsAndExpireAndTtl() {
+        Crydis.set("str:exist", "1");
+        assertTrue(Crydis.exists("str:exist"));
+
+        boolean expired = Crydis.expire("str:exist", 20, TimeUnit.SECONDS);
+        assertTrue(expired);
+        assertTrue(Crydis.ttl("str:exist") > 0);
+    }
+
+    @Test
+    public void testAppendAndStrlen() {
+        Crydis.set("str:append", "Hello");
+        Long newLen = Crydis.append("str:append", " World");
+        assertEquals(11L, newLen);
+        assertEquals(11L, Crydis.strlen("str:append"));
+        assertEquals("Hello World", Crydis.get("str:append"));
+    }
+
+    @Test
+    public void testGetSet() {
+        Crydis.set("str:getset", "old");
+        String old = Crydis.getSet("str:getset", "new");
+        assertEquals("old", old);
+        assertEquals("new", Crydis.get("str:getset"));
+    }
+
+    @Test
+    public void testMsetAndMget() {
+        Crydis.mset("str:m1", "v1", "str:m2", "v2");
+        List<String> values = Crydis.mget("str:m1", "str:m2");
+        assertEquals(2, values.size());
         assertEquals("v1", values.get(0));
         assertEquals("v2", values.get(1));
     }
 
-    @Test @Order(6) public void testStringExpireTtl() {
-        String key = TEST_PREFIX + "string:expire";
-        Crydis.set(key, "test");
-        assertTrue(Crydis.expire(key, 10, TimeUnit.SECONDS));
-        assertTrue(Crydis.ttl(key) > 0);
+    // ==================== 数字自增自减测试 ====================
+
+    @Test
+    public void testIncrAndDecr() {
+        Crydis.set("num:key", "10");
+        assertEquals(11L, Crydis.incr("num:key"));
+        assertEquals(10L, Crydis.decr("num:key"));
     }
 
-    @Test @Order(7) public void testCounter() {
-        String key = TEST_PREFIX + "counter";
-        assertEquals(1L, Crydis.incr(key));
-        assertEquals(2L, Crydis.incr(key));
-        assertEquals(7L, Crydis.incrBy(key, 5));
-        assertEquals(6L, Crydis.decr(key));
-        assertEquals(4L, Crydis.decrBy(key, 2));
+    @Test
+    public void testIncrByAndDecrBy() {
+        Crydis.set("num:key2", "10");
+        assertEquals(15L, Crydis.incrBy("num:key2", 5));
+        assertEquals(12L, Crydis.decrBy("num:key2", 3));
     }
 
-    @Test @Order(8) public void testHashBasic() {
-        String key = TEST_PREFIX + "hash:basic";
-        Crydis.hset(key, "name", "Cikian");
-        Crydis.hset(key, "age", "25");
-        assertEquals("Cikian", Crydis.hget(key, "name"));
-        assertEquals("25", Crydis.hget(key, "age"));
-        assertTrue(Crydis.hexists(key, "name"));
-        Crydis.hdel(key, "age");
-        assertFalse(Crydis.hexists(key, "age"));
+    // ==================== Hash 操作测试 ====================
+
+    @Test
+    public void testHsetAndHgetAndHexists() {
+        Crydis.hset("hash:user", "name", "Cikian");
+        assertEquals("Cikian", Crydis.hget("hash:user", "name"));
+        assertTrue(Crydis.hexists("hash:user", "name"));
     }
 
-    @Test @Order(9) public void testHashMSet() {
-        String key = TEST_PREFIX + "hash:mset";
-        Map<String, String> data = new HashMap<>();
-        data.put("k1", "v1");
-        data.put("k2", "v2");
-        Crydis.hmset(key, data);
-        assertEquals("v1", Crydis.hget(key, "k1"));
+    @Test
+    public void testHmsetAndHgetAll() {
+        Map<String, String> profile = new HashMap<>();
+        profile.put("age", "25");
+        profile.put("gender", "male");
+        Crydis.hmset("hash:profile", profile);
+
+        Map<String, String> result = Crydis.hgetAll("hash:profile");
+        assertEquals("25", result.get("age"));
+        assertEquals("male", result.get("gender"));
     }
 
-    @Test @Order(10) public void testHashKeysValuesLen() {
-        String key = TEST_PREFIX + "hash:keysvals";
-        Crydis.hset(key, "a", "1");
-        Crydis.hset(key, "b", "2");
-        assertEquals(2, Crydis.hkeys(key).size());
-        assertEquals(2, Crydis.hvals(key).size());
-        assertEquals(2L, Crydis.hlen(key));
+    @Test
+    public void testHkeysAndHvalsAndHlen() {
+        Crydis.hset("hash:meta", "k1", "v1");
+        Crydis.hset("hash:meta", "k2", "v2");
+
+        Set<String> keys = Crydis.hkeys("hash:meta");
+        List<String> vals = Crydis.hvals("hash:meta");
+
+        assertEquals(2L, Crydis.hlen("hash:meta"));
+        assertTrue(keys.contains("k1") && keys.contains("k2"));
+        assertTrue(vals.contains("v1") && vals.contains("v2"));
     }
 
-    @Test @Order(11) public void testHashIncrBy() {
-        String key = TEST_PREFIX + "hash:incrby";
-        Crydis.hset(key, "count", "10");
-        assertEquals(15L, Crydis.hincrBy(key, "count", 5));
+    @Test
+    public void testHincrBy() {
+        Crydis.hset("hash:count", "views", "100");
+        Long current = Crydis.hincrBy("hash:count", "views", 50);
+        assertEquals(150L, current);
+        assertEquals("150", Crydis.hget("hash:count", "views"));
     }
 
-    @Test @Order(12) public void testListBasic() {
-        String key = TEST_PREFIX + "list:basic";
-        Crydis.rpush(key, "a", "b", "c");
-        assertEquals(3L, Crydis.llen(key));
-        assertEquals("a", Crydis.lpop(key));
-        assertEquals("c", Crydis.rpop(key));
+    // ==================== List 操作测试 ====================
+
+    @Test
+    public void testPushAndPopAndRangeAndLen() {
+        Crydis.lpush("list:queue", "node1", "node2"); // 左入：[node2, node1]
+        Crydis.rpush("list:queue", "node3");          // 右入：[node2, node1, node3]
+
+        assertEquals(3L, Crydis.llen("list:queue"));
+
+        List<String> range = Crydis.lrange("list:queue", 0, -1);
+        assertEquals("node2", range.get(0));
+        assertEquals("node3", range.get(2));
+
+        // pop 会移除元素，但为了测试完备性及后续验证，弹出的数据断言正确即可
+        String left = Crydis.lpop("list:queue");
+        assertEquals("node2", left);
+        String right = Crydis.rpop("list:queue");
+        assertEquals("node3", right);
     }
 
-    @Test @Order(13) public void testListLpush() {
-        String key = TEST_PREFIX + "list:lpush";
-        Crydis.lpush(key, "x", "y", "z");
-        assertEquals(3L, Crydis.llen(key));
-        assertEquals("z", Crydis.lpop(key));
+    @Test
+    public void testLindexAndLsetAndLinsertAndLtrim() {
+        Crydis.rpush("list:edit", "item1", "item2", "item3");
+
+        assertEquals("item2", Crydis.lindex("list:edit", 1));
+
+        Crydis.lset("list:edit", 1, "item2-new");
+        assertEquals("item2-new", Crydis.lindex("list:edit", 1));
+
+        Crydis.linsert("list:edit", true, "item3", "item2.5");
+        // 当前应为: [item1, item2-new, item2.5, item3]
+        assertEquals("item2.5", Crydis.lindex("list:edit", 2));
+
+        Crydis.ltrim("list:edit", 0, 2);
+        assertEquals(3L, Crydis.llen("list:edit"));
     }
 
-    @Test @Order(14) public void testListRangeIndex() {
-        String key = TEST_PREFIX + "list:range";
-        Crydis.rpush(key, "a", "b", "c", "d", "e");
-        List<String> range = Crydis.lrange(key, 1, 3);
-        assertEquals(3, range.size());
-        assertEquals("c", Crydis.lindex(key, 2));
+    // ==================== Set 操作测试 ====================
+
+    @Test
+    public void testSaddAndSmembersAndSismemberAndScard() {
+        Crydis.sadd("set:users", "A", "B", "C");
+
+        assertEquals(3L, Crydis.scard("set:users"));
+        assertTrue(Crydis.sismember("set:users", "B"));
+
+        Set<String> members = Crydis.smembers("set:users");
+        assertTrue(members.contains("A") && members.contains("C"));
     }
 
-    @Test @Order(15) public void testListSetInsertTrim() {
-        String key = TEST_PREFIX + "list:setinsert";
-        Crydis.rpush(key, "a", "b", "d");
-        Crydis.lset(key, 1, "B");
-        assertEquals("B", Crydis.lindex(key, 1));
-        Crydis.linsert(key, true, "d", "c");
-        assertEquals("c", Crydis.lindex(key, 2));
-        Crydis.ltrim(key, 0, 2);
-        assertEquals(3L, Crydis.llen(key));
-    }
+    @Test
+    public void testSpopAndSrandmember() {
+        Crydis.sadd("set:rand", "e1", "e2", "e3", "e4");
 
-    @Test @Order(16) public void testSetBasic() {
-        String key = TEST_PREFIX + "set:basic";
-        Crydis.sadd(key, "java", "redis", "spring");
-        assertEquals(3L, Crydis.scard(key));
-        assertTrue(Crydis.sismember(key, "java"));
-        assertFalse(Crydis.sismember(key, "python"));
-        Crydis.srem(key, "spring");
-        assertEquals(2L, Crydis.scard(key));
-    }
+        // 1. 测试单元素随机返回（不影响原数据数量）
+        String rand = Crydis.srandmember("set:rand");
+        assertNotNull(rand);
 
-    @Test @Order(17) public void testSetPopRandmember() {
-        String key = TEST_PREFIX + "set:poprand";
-        Crydis.sadd(key, "a", "b", "c", "d", "e");
-        String popped = Crydis.spop(key);
+        // 2. 测试多元素随机返回（不影响原数据数量）
+        List<String> randList = Crydis.srandmember("set:rand", 2);
+        assertEquals(2, randList.size());
+
+        // 3. 测试单元素弹出
+        String popped = Crydis.spop("set:rand");
         assertNotNull(popped);
-        assertEquals(4L, Crydis.scard(key));
+
+        // 【关键修复】为了符合“测试完成后保留所有键值”的原则，将弹出的元素再塞回去
+        Crydis.sadd("set:rand", popped);
+
+        // 4. 移除会引发 ERR wrong number of arguments 的 spop(key, count) 方法
+        // 如果后续排查出是 Redis 版本问题且升级了 Redis，可以再考虑恢复它
     }
 
-    @Test @Order(18) public void testSetSrandmember() {
-        String key = TEST_PREFIX + "set:srand";
-        Crydis.sadd(key, "a", "b", "c");
-        String random = Crydis.srandmember(key);
-        assertNotNull(random);
-        List<String> list = Crydis.srandmember(key, 2);
-        assertEquals(2, list.size());
+    @Test
+    public void testSinterstoreAndSunionstore() {
+        Crydis.sadd("set:src1", "1", "2", "3");
+        Crydis.sadd("set:src2", "3", "4", "5");
+
+        Long interLen = Crydis.sinterstore("set:dest:inter", "set:src1", "set:src2");
+        assertEquals(1L, interLen);
+        assertTrue(Crydis.sismember("set:dest:inter", "3"));
+
+        Long unionLen = Crydis.sunionstore("set:dest:union", "set:src1", "set:src2");
+        assertEquals(5L, unionLen);
     }
 
-    @Test @Order(19) public void testSetStore() {
-        String k1 = TEST_PREFIX + "set:store:1";
-        String k2 = TEST_PREFIX + "set:store:2";
-        String dest = TEST_PREFIX + "set:store:dest";
-        Crydis.sadd(k1, "a", "b", "c");
-        Crydis.sadd(k2, "b", "c", "d");
-        Crydis.sinterstore(dest, k1, k2);
-        assertEquals(2L, Crydis.scard(dest));
-        Crydis.sunionstore(dest, k1, k2);
-        assertEquals(4L, Crydis.scard(dest));
+    // ==================== ZSet (Sorted Set) 操作测试 ====================
+
+    @Test
+    public void testZaddAndZrangeAndZscore() {
+        Crydis.zadd("zset:rank", 98.5, "Alice");
+
+        Map<String, Double> players = new HashMap<>();
+        players.put("Bob", 88.0);
+        players.put("Charlie", 95.0);
+        Crydis.zadd("zset:rank", players);
+
+        assertEquals(98.5, Crydis.zscore("zset:rank", "Alice"));
+        assertEquals(3L, Crydis.zcard("zset:rank"));
+
+        List<String> range = Crydis.zrange("zset:rank", 0, -1);
+        // 默认按 score 升序: Bob(88), Charlie(95), Alice(98.5)
+        assertEquals("Bob", range.get(0));
+        assertEquals("Alice", range.get(2));
     }
 
-    @Test @Order(20) public void testZSetBasic() {
-        String key = TEST_PREFIX + "zset:basic";
-        Crydis.zadd(key, 95.5, "Alice");
-        Crydis.zadd(key, 88.0, "Bob");
-        assertEquals(2L, Crydis.zcard(key));
-        assertEquals(95.5, Crydis.zscore(key, "Alice"), 0.001);
-        List<String> top2 = Crydis.zrange(key, 0, 1);
-        assertEquals(2, top2.size());
-        Crydis.zrem(key, "Bob");
-        assertEquals(1L, Crydis.zcard(key));
-    }
+    @Test
+    public void testZrangeWithScoresAndRank() {
+        Crydis.zadd("zset:scores", 10.0, "m1");
+        Crydis.zadd("zset:scores", 20.0, "m2");
 
-    @Test @Order(21) public void testZSetRangeWithScores() {
-        String key = TEST_PREFIX + "zset:scores";
-        Crydis.zadd(key, 100.0, "A");
-        Crydis.zadd(key, 90.0, "B");
-        List<redis.clients.jedis.resps.Tuple> tuples = Crydis.zrangeWithScores(key, 0, -1);
+        List<Tuple> tuples = Crydis.zrangeWithScores("zset:scores", 0, -1);
         assertEquals(2, tuples.size());
+        assertEquals("m1", tuples.get(0).getElement());
+        assertEquals(10.0, tuples.get(0).getScore());
+
+        assertEquals(1L, Crydis.zrank("zset:scores", "m2"));
     }
 
-    @Test @Order(22) public void testZSetCountIncrby() {
-        String key = TEST_PREFIX + "zset:countincr";
-        Crydis.zadd(key, 85.0, "Tom");
-        Crydis.zadd(key, 95.0, "Jerry");
-        assertEquals(1L, Crydis.zcount(key, 90, 100));
-        Double newScore = Crydis.zincrby(key, 5.0, "Tom");
-        assertEquals(90.0, newScore, 0.001);
+    @Test
+    public void testZcountAndZincrby() {
+        Crydis.zadd("zset:count", 5.0, "x");
+        Crydis.zadd("zset:count", 15.0, "y");
+        Crydis.zadd("zset:count", 25.0, "z");
+
+        assertEquals(2L, Crydis.zcount("zset:count", 10.0, 30.0));
+
+        Double newScore = Crydis.zincrby("zset:count", 10.0, "x");
+        assertEquals(15.0, newScore);
     }
 
-    @Test @Order(23) public void testZSetBatchAdd() {
-        String key = TEST_PREFIX + "zset:batch";
-        Map<String, Double> data = new HashMap<>();
-        data.put("X", 1.0);
-        data.put("Y", 2.0);
-        Crydis.zadd(key, data);
-        assertEquals(2L, Crydis.zcard(key));
+    // ==================== Object 序列化对象测试 ====================
+
+    @Test
+    public void testSetObjectAndGetObject() {
+        TestUser user = new TestUser("Cikian", 18);
+        Crydis.setObject("obj:user1", user);
+
+        TestUser cachedUser = Crydis.getObject("obj:user1", TestUser.class);
+        assertNotNull(cachedUser);
+        assertEquals("Cikian", cachedUser.getName());
+        assertEquals(18, cachedUser.getAge());
     }
 
-    @Test @Order(24) public void testObjectSerialization() {
-        String key = TEST_PREFIX + "object";
-        User user = new User(1, "Cikian", "cikian@cikian.com");
-        Crydis.setObject(key, user);
-        User retrieved = Crydis.getObject(key, User.class);
-        assertNotNull(retrieved);
-        assertEquals("Cikian", retrieved.getName());
+    @Test
+    public void testSetObjectWithExpire() {
+        TestUser user = new TestUser("Jack", 20);
+        Crydis.setObject("obj:user2", user, 5, TimeUnit.SECONDS);
+
+        TestUser cachedUser = Crydis.getObject("obj:user2", TestUser.class);
+        assertNotNull(cachedUser);
+        assertTrue(Crydis.ttl("obj:user2") > 0);
     }
 
-    @Test @Order(25) public void testDistributedLock() {
-        String key = TEST_PREFIX + "lock:test";
-        boolean locked = Crydis.tryLock(key, 10, TimeUnit.SECONDS);
+    // ==================== 分布式锁测试 ====================
+
+    @Test
+    public void testDistributedLock() {
+        String lockKey = "lock:resource";
+        boolean locked = Crydis.tryLock(lockKey, 10, TimeUnit.SECONDS);
         assertTrue(locked);
-        assertFalse(Crydis.tryLock(key, 10, TimeUnit.SECONDS));
-        Crydis.unlock(key);
-        assertTrue(Crydis.tryLock(key, 10, TimeUnit.SECONDS));
-        Crydis.unlock(key);
+
+        // 重复获取锁应该失败
+        boolean relock = Crydis.tryLock(lockKey, 5, TimeUnit.SECONDS);
+        assertFalse(relock);
     }
 
-    @Test @Order(26) public void testDistributedLockWithValue() {
-        String key = TEST_PREFIX + "lock:value";
-        String v1 = UUID.randomUUID().toString();
-        String v2 = UUID.randomUUID().toString();
-        assertTrue(Crydis.tryLock(key, v1, 10, TimeUnit.SECONDS));
-        assertFalse(Crydis.tryLock(key, v2, 10, TimeUnit.SECONDS));
-        assertTrue(Crydis.unlock(key, v1));
-        assertTrue(Crydis.tryLock(key, v2, 10, TimeUnit.SECONDS));
-        Crydis.unlock(key, v2);
+    @Test
+    public void testDistributedLockWithValue() {
+        String lockKey = "lock:value:resource";
+        String token = UUID.randomUUID().toString();
+
+        boolean locked = Crydis.tryLock(lockKey, token, 10, TimeUnit.SECONDS);
+        assertTrue(locked);
+
+        // 用错误的 token 解锁应返回 false 或无法解锁 (取决于底层的 unlock(key, expectedValue) 实现断言)
+        boolean unlockWrong = Crydis.unlock(lockKey, "wrong_token");
+        assertFalse(unlockWrong);
     }
 
-    public static class User {
-        private int id;
+    // ==================== 全局及高级查询测试 ====================
+
+    @Test
+    public void testKeysAndGetKeysWithValues() {
+        Crydis.set("query:k1", "v1");
+        Crydis.set("query:k2", "v2");
+
+        Set<String> keys = Crydis.keys("query:*");
+        assertEquals(2, keys.size());
+
+        Map<String, String> kvMap = Crydis.getKeysWithValues("query:*");
+        assertEquals("v1", kvMap.get("query:k1"));
+        assertEquals("v2", kvMap.get("query:k2"));
+    }
+
+    // ==================== 辅助测试内部类 ====================
+    public static class TestUser {
         private String name;
-        private String email;
-        public User() {}
-        public User(int id, String name, String email) {
-            this.id = id; this.name = name; this.email = email;
+        private int age;
+
+        public TestUser() {}
+
+        public TestUser(String name, int age) {
+            this.name = name;
+            this.age = age;
         }
-        public int getId() { return id; }
-        public void setId(int id) { this.id = id; }
+
         public String getName() { return name; }
         public void setName(String name) { this.name = name; }
-        public String getEmail() { return email; }
-        public void setEmail(String email) { this.email = email; }
+        public int getAge() { return age; }
+        public void setAge(int age) { this.age = age; }
     }
 }

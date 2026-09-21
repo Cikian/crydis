@@ -69,22 +69,37 @@ public class CrydisManager {
             return this;
         }
 
-        public Crydis init() {
-            if (configuration.getHost() == null || configuration.getHost().isEmpty()) {
-                throw new IllegalArgumentException("Redis host不能为空");
-            }
-
-            RedisClient redisClient = new RedisClient(configuration);
-            Crydis.init(redisClient);
-            // 修复原始代码中无论如何都返回 null 的 Bug
-            return new Crydis(redisClient);
+        /**
+         * 支持非 Spring 链式配置安全包白名单列表。
+         *
+         * <p>fastjson2 的白名单是文本前缀匹配且不支持 {@code *} 通配符：
+         * {@code "cn.foo."} 放行 {@code cn.foo} 包下所有类。只有在需要反序列化多态字段
+         * （JSON 中带 {@code @type}）时才需要配置；不配置时默认只放行目标类型自身。</p>
+         */
+        public Builder allowedPackages(java.util.List<String> allowedPackages) {
+            configuration.setAllowedPackages(allowedPackages);
+            return this;
         }
 
+        /**
+         * 是否还原最外层带双引号的字符串，仅用于兼容历史版本写入的数据，默认 false。
+         */
+        public Builder unwrapQuotedString(boolean unwrapQuotedString) {
+            configuration.setUnwrapQuotedString(unwrapQuotedString);
+            return this;
+        }
+
+        public Crydis init() {
+            return build();
+        }
+
+        /**
+         * 构建并注册静态客户端。
+         */
         public Crydis build() {
             if (configuration.getHost() == null || configuration.getHost().isEmpty()) {
                 throw new IllegalArgumentException("Redis host不能为空");
             }
-
             RedisClient redisClient = new RedisClient(configuration);
             Crydis.init(redisClient);
             return new Crydis(redisClient);

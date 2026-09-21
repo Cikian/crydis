@@ -3,6 +3,8 @@ package cn.cikian.crydis.model;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.util.List;
+
 /**
  * Crydis配置类
  *
@@ -11,7 +13,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @since 2026-05-31
  */
 @Data
-@ConfigurationProperties(prefix = "crydis")
+@ConfigurationProperties(prefix = "ck.crydis")
 public class CrydisConfiguration {
 
     private boolean enable = false;
@@ -19,6 +21,8 @@ public class CrydisConfiguration {
     private String host;
 
     private Integer port = 6379;
+
+    private String user;
 
     private String password;
 
@@ -34,6 +38,17 @@ public class CrydisConfiguration {
 
     private Long maxWait = 3000L;
 
+    private List<String> allowedPackages = new java.util.ArrayList<>();
+
+    /**
+     * 是否还原最外层带双引号的字符串（仅用于兼容历史版本写入的数据）。
+     *
+     * <p>历史版本写入 String 时不做任何转义，读取时却统一剥离首尾双引号，
+     * 导致写入 {@code "abc"} 读出来变成 {@code abc}（数据被静默篡改）。
+     * 默认 {@code false} 表示不做任何处理、保证读写对称；仅当需要读取历史数据时才设为 true。</p>
+     */
+    private boolean unwrapQuotedString = false;
+
     public CrydisConfiguration() {
     }
 
@@ -48,6 +63,8 @@ public class CrydisConfiguration {
                 "最大连接数：" + this.maxActive + "\n" +
                 "最大空闲连接：" + this.maxIdle + "\n" +
                 "最小空闲连接：" + this.minIdle + "\n" +
-                "最大等待时间：" + this.maxWait + "ms\n";
+                "最大等待时间：" + this.maxWait + "ms\n" +
+                "安全白名单：" + this.allowedPackages + "\n" +
+                "还原引号字符串：" + this.unwrapQuotedString + "\n";
     }
 }
